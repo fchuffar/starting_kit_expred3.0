@@ -1,0 +1,131 @@
+---
+title: "Gene Expression Prediction Challenge 3.0 (expred3.0)"
+subtitle: "sujet et compte rendu"
+author: "Florent Chuffart - Team 0"
+date: "`r Sys.Date()`"
+output:
+  rmarkdown::html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    number_sections: true
+---
+
+```{r, echo=FALSE, eval=TRUE}
+knitr::opts_chunk$set(collapse=TRUE, comment = "#>", fig.width=9, fig.height=6, eval=TRUE, echo=FALSE, results="hide")
+``` 
+
+# Objectif
+
+On cherche à expliquer l’expression du gène ALS2 dans le jeu de données TCGA-LGG.
+
+# Statistique descriptive
+
+**Le jeu de donnée `data_train`**
+
+```{r loading_data, echo=TRUE, results="verbatim"}
+data_train <- readRDS(file = "data_train.rds")
+data_test <- readRDS(file = "data_test.rds")
+head(data_train[,1:6])
+```
+
+**Distribution de l’expression de ALS2**
+
+```{r}
+plot(density(data_train$ALS2))
+```
+
+**Distribution de l’expression des gènes dans `data_train`**
+
+```{r}
+plot(density(as.matrix(data_train[,4:1003])))
+```
+
+**Distribution du methylome dans `data_train`**
+
+```{r}
+plot(density(as.matrix(data_train[,1004:2003])))
+```
+
+# Method 1 : SIS
+
+La method SIS [Shurely Independant Screening, Zhang HH. J R Stat Soc Series B Stat Methodol. 2008] appliquée au *transcriptome* (définir) consiste à réaliser autant de regressions linéaires simples qu’il y a de variables explicatives (gènes).
+
+*Scores*, pour chaque gène $g$ on calcule le $\beta_{g}$ et la p-valeur $pv_g$ associée. 
+
+*Selections*, on selectionne sur le *volcano plot* les gènes qui ont les meilleurs scores, indépendamment les uns des autres.
+
+*modèle*, on réalise le modèle de regression linéaire multiple expliquant l’expression de ALS2.
+
+**Calcul des modèles indépendants**
+
+Pour chaque gènes calculer le $\beta_{gene}$ et la p-valeur associée au modèle $ALS2~gène$.
+
+```{r sis_compute_models}
+gs = colnames(data_train)[5:1003]
+gs
+# Go!
+```
+
+**Volcano plot**
+
+Afficher : 
+
+- en abscisse les $\beta_{gene}$
+- en ordonée les $-log10(p-valeurs)$ associées
+
+```{r sis_compute_volcano}
+# Go!
+```
+
+**Sélection de variable et prédiction**
+
+```{r sis_pred}
+# Go!
+```
+
+
+# Method 2 : ACP
+
+
+```{r pca2, eval=TRUE}
+d = as.matrix(data_train[,1004:2003])
+pca = prcomp(d, scale=TRUE)
+
+v = pca$sdev * pca$sdev
+p = v / sum(v) * 100
+
+layout(matrix(1:6,2), respect=TRUE)
+# layout(matrix(1:2,1), respect=TRUE)
+barplot(p)
+
+data_train$histo2 = as.factor(substr(data_train$histology, 1, 5))
+# data_train$histo2 = data_train$histology
+for (i in 1:5) {
+  j = i+1
+  plot(pca$x[,i], pca$x[,j], xlab=paste0("PC", i, "(", signif(p[i], 3), "%)"), ylab=paste0("PC", j, "(", signif(p[j], 3), "%)"), pch=16, col=as.numeric(data_train[rownames(pca$x),]$histo2))
+  scale_factor = min(abs(c(min(c(pca$x[,i], pca$x[,j])), max(c(pca$x[,i], pca$x[,j])))))  
+  # scale_factor = min(abs(c(max(min(pca$x[,i]), min(pca$x[,j])), min(max(pca$x[,i]), max(pca$x[,j])))))
+  plotrix::draw.ellipse(0,0,scale_factor,scale_factor, lty=2, border="grey")
+  # arrows(0,0,pca$rotation[,i]*scale_factor, pca$rotation[,j]*scale_factor, col="grey")
+  # text(pca$rotation[,i]*scale_factor, pca$rotation[,j]*scale_factor, rownames(pca$rotation))
+}
+```
+
+```{r pairs, fig.height=9}
+pairs(pca$x[,1:8], pch=".", col=as.numeric(data_train[rownames(pca$x),]$histo2))
+```
+
+```{r hm, eval=FALSE}
+data = t(as.matrix(data_train[,0004:1003]))
+source("~/projects/epimedpipelines/results/commons.R")
+plot_expr_hm(data=data, normalization="zscore_rows",   colors=c("cyan", "cyan", "black", "red", "red"))
+```
+# Session Information
+
+```{r, results="verbatim"}
+sessionInfo()
+```
+
+
+
