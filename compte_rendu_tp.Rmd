@@ -74,8 +74,8 @@ gs
 
 Afficher : 
 
-- en abscisse les $-log10(p-valeurs)$ du test de Shapiro-Wilk sur les résidus
-- en ordonée les $-log10(p-valeurs)$ associées
+- en abscisse les $-log10(p-valeurs)$ des tests de Shapiro-Wilk sur les résidus de chacun des modèles indépendants,
+- en ordonée les $-log10(p-valeurs)$ des tests de Student (ou Fisher) associés.
 
 ```{r sis_normalité}
 # Go!
@@ -87,8 +87,8 @@ Commenter.
 
 Afficher : 
 
-- en abscisse les $\beta_{gene}$
-- en ordonée les $-log10(p-valeurs)$ associées
+- en abscisse les $\beta_{gene}$ des modéles de régression simple pour chaque gène $g$,
+- en ordonée les $-log10(p-valeurs)$ des tests de Student (ou Fisher) associés.
 
 ```{r sis_compute_volcano}
 # Go!
