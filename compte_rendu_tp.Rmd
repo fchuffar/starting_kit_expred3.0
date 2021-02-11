@@ -17,9 +17,10 @@ knitr::opts_chunk$set(collapse=TRUE, comment = "#>", fig.width=9, fig.height=6, 
 
 # Objectif
 
-On cherche à expliquer l’expression du gène ALS2 dans le jeu de données TCGA-LGG.
+1. On cherche à expliquer l’expression du gène ALS2 dans le jeu de données data_train,
+2. Pour rédire les valeurs d’expression du gène ALS2 dans le jeu de données data_test.
 
-# Statistique descriptive
+# Statistiques descriptives
 
 **Le jeu de donnée `data_train`**
 
@@ -35,13 +36,15 @@ head(data_train[,1:6])
 plot(density(data_train$ALS2))
 ```
 
-**Distribution de l’expression des gènes dans `data_train`**
+**Distribution du transcriptome dans `data_train`**
 
 ```{r}
 plot(density(as.matrix(data_train[,4:1003])))
 ```
 
 **Distribution du methylome dans `data_train`**
+
+Pas utilisé dans ce TP.
 
 ```{r}
 plot(density(as.matrix(data_train[,1004:2003])))
@@ -51,21 +54,34 @@ plot(density(as.matrix(data_train[,1004:2003])))
 
 La method SIS [Shurely Independant Screening, Zhang HH. J R Stat Soc Series B Stat Methodol. 2008] appliquée au *transcriptome* (définir) consiste à réaliser autant de regressions linéaires simples qu’il y a de variables explicatives (gènes).
 
-*Scores*, pour chaque gène $g$ on calcule le $\beta_{g}$ et la p-valeur $pv_g$ associée. 
+*Critères*, pour chaque gène $g$ on calcule le $\beta_{g}$ et la p-valeur $pv_g$ associée. 
 
-*Selections*, on selectionne sur le *volcano plot* les gènes qui ont les meilleurs scores, indépendamment les uns des autres.
+*Selection de variables*, on selectionne sur le *volcano plot* les gènes qui ont les meilleurs scores, indépendamment les uns des autres.
 
-*modèle*, on réalise le modèle de regression linéaire multiple expliquant l’expression de ALS2.
+*Modèle*, on propose un modèle de regression linéaire multiple expliquant l’expression de ALS2.
 
 **Calcul des modèles indépendants**
 
-Pour chaque gènes calculer le $\beta_{gene}$ et la p-valeur associée au modèle $ALS2~gène$.
+Pour chaque gènes calculer le $\beta_{gene}$ et la p-valeur associée au modèle $ALS2~gène$, on charactérisera aussi la distribution des résidus.
 
 ```{r sis_compute_models}
 gs = colnames(data_train)[5:1003]
 gs
 # Go!
 ```
+
+**Normalité**
+
+Afficher : 
+
+- en abscisse les $-log10(p-valeurs)$ du test de Shapiro-Wilk sur les résidus
+- en ordonée les $-log10(p-valeurs)$ associées
+
+```{r sis_normalité}
+# Go!
+```
+Commenter.
+
 
 **Volcano plot**
 
@@ -77,12 +93,36 @@ Afficher :
 ```{r sis_compute_volcano}
 # Go!
 ```
+Commenter.
 
-**Sélection de variable et prédiction**
+
+
+**Sélection de variable
+
+Enumérez vos critères.
+
+Ecrire la formulation analystique de votre modèles.
+
+**Prédiction**
+
+1. Prédisez les valeurs de ALS2 du jeu de donnée `data_train`
+2. Prédisez les valeurs de ALS2 du jeu de donnée `data_test`
+3. Score obtenu sur codalab
+4. Comparer
 
 ```{r sis_pred}
+"RMSE" = function(data_truth, data_pred) {
+    # Root Mean Square Error
+    return(sqrt(mean((data_truth - data_pred)^2)))
+}
 # Go!
+data_truth = data_train$ALS2
+# data_pred = predict(data_train...)
+# score =  RMSE(data_truth, data_train)
 ```
+
+**Commentaires
+
 
 
 # Method 2 : ACP
@@ -99,8 +139,8 @@ layout(matrix(1:6,2), respect=TRUE)
 # layout(matrix(1:2,1), respect=TRUE)
 barplot(p)
 
-data_train$histo2 = as.factor(substr(data_train$histology, 1, 5))
-# data_train$histo2 = data_train$histology
+# data_train$histo2 = as.factor(substr(data_train$histology, 1, 5))
+data_train$histo2 = data_train$histology
 for (i in 1:5) {
   j = i+1
   plot(pca$x[,i], pca$x[,j], xlab=paste0("PC", i, "(", signif(p[i], 3), "%)"), ylab=paste0("PC", j, "(", signif(p[j], 3), "%)"), pch=16, col=as.numeric(data_train[rownames(pca$x),]$histo2))
@@ -121,6 +161,8 @@ data = t(as.matrix(data_train[,0004:1003]))
 source("~/projects/epimedpipelines/results/commons.R")
 plot_expr_hm(data=data, normalization="zscore_rows",   colors=c("cyan", "cyan", "black", "red", "red"))
 ```
+
+
 # Session Information
 
 ```{r, results="verbatim"}
