@@ -64,10 +64,33 @@ La method SIS [Shurely Independant Screening, Zhang HH. J R Stat Soc Series B St
 
 Pour chaque gènes calculer le $\beta_{gene}$ et la p-valeur associée au modèle $ALS2~gène$, on charactérisera aussi la distribution des résidus.
 
-```{r sis_compute_models}
+```{r sis_compute_models, echo=TRUE}
 gs = colnames(data_train)[5:1003]
 gs
 # Go!
+for (i in 1:length(gs)) {
+  g = gs[i]
+  print(g)
+  m = lm(data_train[,"ALS2"]~data_train[,g])
+}
+
+
+pval_shapiro = c()
+pval_fisher = c()
+beta = c()
+for (g in gs) {
+  print(g)
+  m = lm(data_train[,"ALS2"]~data_train[,g])
+  res = m$residuals
+  pval_shapiro = c(pval_shapiro,shapiro.test(res)$p.value)
+  pval_fisher = c(pval_fisher, anova(m)[1,5])
+  beta = c(beta, m$coefficients[[2]])
+}
+names(pval_shapiro) = gs
+names(pval_fisher)  = gs
+names(beta)         = gs
+
+
 ```
 
 **Normalité**
@@ -79,6 +102,8 @@ Afficher :
 
 ```{r sis_normalité}
 # Go!
+plot(-log10(pval_shapiro), -log10(pval_fisher))
+
 ```
 Commenter.
 
@@ -92,6 +117,27 @@ Afficher :
 
 ```{r sis_compute_volcano}
 # Go!
+layout(1, respect=TRUE)
+plot(beta, -log10(pval_fisher), col="grey")
+text(beta, -log10(pval_fisher), names(beta))
+
+g = "RGS7BP"
+m = lm(data_train[,"ALS2"]~data_train[,g])
+plot(data_train[,g], data_train[,"ALS2"], main=g)
+abline(m, col=2)
+summary(m)$r.squared
+
+m = lm(ALS2~RGS7BP,data_train)
+
+plot(data_train[,"MFAP3"], data_train[,"RGS7BP"], main=g)
+
+plot(data_train[,"VMO1"], data_train[,"RGS7BP"], main=g)
+
+
+
+
+pairs(data_train[,names(sort(pval_fisher)[1:8])])
+
 ```
 Commenter.
 
@@ -102,6 +148,42 @@ Commenter.
 Enumérez vos critères.
 
 Ecrire la formulation analystique de votre modèles.
+
+
+
+```{r echo=TRUE, results=verbatim}
+selected_genes = names(sort(pval_fisher)[1:8])
+selected_genes
+
+m1 = lm(ALS2~RGS7BP,data_train)
+summary(m1)$r.squared
+
+m8 = lm(ALS2~RGS7BP+MFAP3+PRRC2C+VMO1+SCRN3+NRIP1+PCNX1+TMUB1, data_train)
+summary(m8)$r.squared
+
+selected_genes = names(sort(pval_fisher)[1:12])
+formula = as.formula(paste0("ALS2~", paste0(selected_genes, collapse="+")))
+formula
+m12 = lm(formula, data_train)
+summary(m12)$r.squared
+
+
+r2 = c()
+for (i in 1:12) {
+  selected_genes = names(sort(pval_fisher)[1:i])
+  formula = as.formula(paste0("ALS2~", paste0(selected_genes, collapse="+")))
+  formula
+  mi = lm(formula, data_train)
+  r2 = c(r2,summary(mi)$r.squared)
+}
+
+plot(r2)
+```
+
+Tracer :
+  - en abscisse i de 1 à 12
+  - en ordonnée `summary(mi)$r.squared`
+
 
 **Prédiction**
 
@@ -119,6 +201,61 @@ Ecrire la formulation analystique de votre modèles.
 data_truth = data_train$ALS2
 # data_pred = predict(data_train...)
 # score =  RMSE(data_truth, data_train)
+
+m0 = lm(ALS2~1, data_train)
+data_pred = predict(m0, data_train, type="response")
+data_truth = data_train$ALS2
+err0_train0 = RMSE(data_truth, data_pred)
+err0_train0
+err0_test0
+
+m1 = lm(ALS2~RGS7BP, data_train)
+data_pred = predict(m1, data_train, type="response")
+data_truth = data_train$ALS2
+err0_train1 = RMSE(data_truth, data_pred)
+err0_train1
+err0_test1
+
+m2 = lm(ALS2~RGS7BP+MFAP3, data_train)
+data_pred = predict(m2, data_train, type="response")
+data_truth = data_train$ALS2
+err0_train2 = RMSE(data_truth, data_pred)
+err0_train2
+err0_test2
+
+err_test = c()
+err_test[1] = 0.2800726811
+err_test[2] = 0.2370102069
+err_test[3] = 0.2351253487
+err_test[4] = 0.2299540168
+err_test[5] = 0.2142468642
+err_test[6] = 0.2169962834
+err_test[7] = 0.2159720152
+err_test[8] = 0.2154245011  
+
+err_train = c()
+for (i in 1:8) {
+  selected_genes = names(sort(pval_fisher)[1:i])
+  formula = as.formula(paste0("ALS2~", paste0(selected_genes, collapse="+")))
+  formula
+  mi = lm(formula, data_train)
+  data_pred = predict(mi, data_train, type="response")
+  data_truth = data_train$ALS2
+  err_train[i] = RMSE(data_truth, data_pred)
+}
+
+
+
+plot( 1:8, err_test, ylim=c(0,0.4), col=2, type="l")
+lines(1:8, err_train, col=4)
+legend("bottomleft", col=c(2,4), c("test", "train"), lty=1)
+....
+
+
+
+  
+
+
 ```
 
 **Commentaires

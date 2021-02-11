@@ -86,7 +86,7 @@ program <- function(data_train, data_test) {
     ## 
     
     # use NULL model to predict for ALS2 expression
-    m = lm(ALS2~1, data_train)
+    m = lm(ALS2~RGS7BP+MFAP3, data_train)
     data_pred = predict(m, data_test, type="response")
 
     # alternative prediction functions are given below
