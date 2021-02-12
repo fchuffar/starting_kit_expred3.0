@@ -223,16 +223,6 @@ err0_train2 = RMSE(data_truth, data_pred)
 err0_train2
 err0_test2
 
-err_test = c()
-err_test[1] = 0.2800726811
-err_test[2] = 0.2370102069
-err_test[3] = 0.2351253487
-err_test[4] = 0.2299540168
-err_test[5] = 0.2142468642
-err_test[6] = 0.2169962834
-err_test[7] = 0.2159720152
-err_test[8] = 0.2154245011  
-
 err_train = c()
 for (i in 1:8) {
   selected_genes = names(sort(pval_fisher)[1:i])
@@ -243,6 +233,17 @@ for (i in 1:8) {
   data_truth = data_train$ALS2
   err_train[i] = RMSE(data_truth, data_pred)
 }
+ 
+err_test = c()
+err_test[1] = 0.2800726811
+err_test[2] = 0.2370102069
+err_test[3] = 0.2351253487
+err_test[4] = 0.2299540168
+err_test[5] = 0.2142468642
+err_test[6] = 0.2169962834
+err_test[7] = 0.2159720152
+err_test[8] = 0.2154245011  
+
 
 
 
