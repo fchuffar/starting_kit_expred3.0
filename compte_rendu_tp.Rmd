@@ -151,7 +151,7 @@ Ecrire la formulation analystique de votre modèles.
 
 
 
-```{r echo=TRUE, results=verbatim}
+```{r echo=TRUE, results="verbatim"}
 selected_genes = names(sort(pval_fisher)[1:8])
 selected_genes
 
@@ -207,21 +207,18 @@ data_pred = predict(m0, data_train, type="response")
 data_truth = data_train$ALS2
 err0_train0 = RMSE(data_truth, data_pred)
 err0_train0
-err0_test0
 
 m1 = lm(ALS2~RGS7BP, data_train)
 data_pred = predict(m1, data_train, type="response")
 data_truth = data_train$ALS2
 err0_train1 = RMSE(data_truth, data_pred)
 err0_train1
-err0_test1
 
 m2 = lm(ALS2~RGS7BP+MFAP3, data_train)
 data_pred = predict(m2, data_train, type="response")
 data_truth = data_train$ALS2
 err0_train2 = RMSE(data_truth, data_pred)
 err0_train2
-err0_test2
 
 err_train = c()
 for (i in 1:8) {
@@ -250,7 +247,7 @@ err_test[8] = 0.2154245011
 plot( 1:8, err_test, ylim=c(0,0.4), col=2, type="l")
 lines(1:8, err_train, col=4)
 legend("bottomleft", col=c(2,4), c("test", "train"), lty=1)
-....
+
 
 
 
