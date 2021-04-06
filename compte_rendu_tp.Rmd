@@ -1,7 +1,7 @@
 ---
 title: "Gene Expression Prediction Challenge 3.0 (expred3.0)"
-subtitle: "sujet et compte rendu"
-author: "Florent Chuffart - Team 0"
+subtitle: "Compte-rendu à compléter"
+author: "Florent Chuffart"
 date: "`r Sys.Date()`"
 output:
   rmarkdown::html_document:
@@ -15,290 +15,452 @@ output:
 knitr::opts_chunk$set(collapse=TRUE, comment = "#>", fig.width=9, fig.height=6, eval=TRUE, echo=FALSE, results="hide")
 ``` 
 
-# Objectif
+Ce document propose deux méthodes pour résoudre le *data challenge* `expred3.0` disponible ici : 
 
-1. On cherche à expliquer l’expression du gène ALS2 dans le jeu de données data_train,
-2. Pour rédire les valeurs d’expression du gène ALS2 dans le jeu de données data_test.
+https://competitions.codalab.org/competitions/28931?secret_key=156ec53c-3ae2-4788-ac69-1eb11c467910
+
+L’**objectif** est double : 
+
+1. on cherche à expliquer l’expression du gène ALS2 dans le jeu de données `data_train` ;
+2. pour prédire les valeurs d’expression du gène ALS2 dans le jeu de données `data_test`.
+
+Dans ce document nous allons essentiellement travailler du le jeu de données d’apprentissage `data_train`.
+
+Nous allons définir deux méthodes : la première se fonde sur la méthode *Surely Independant Screening*, la seconde sur la méthode de sélection de variable *step forward*.
+
+Nous allons mettre en oeuvre une stratégie de validation croisée pour fixer les hyper-paramètres de ces deux méthodes.
+
+Finalement, nous confronterons les résultats obtenus sur le jeu de données d’apprentissage par validation croisée avec ceux obtenus en ligne sur le jeu de données de test.
 
 # Statistiques descriptives
 
 **Le jeu de donnée `data_train`**
 
 ```{r loading_data, echo=TRUE, results="verbatim"}
-data_train <- readRDS(file = "data_train.rds")
-data_test <- readRDS(file = "data_test.rds")
+data_train = readRDS(file = "data_train.rds")
+data_test = readRDS(file = "data_test.rds")
+dim(data_train)
+dim(data_test)
 head(data_train[,1:6])
+table(data_train$sex)
+table(data_train$histology)
+head(data_train[,1004:1009])
 ```
 
-**Distribution de l’expression de ALS2**
+**Distribution de l’expression de ALS2 dans `data_train`**
 
-```{r}
+```{r distr_als2, echo=TRUE, results="verbatim"}
+layout(matrix(1:2, 1), respect=TRUE)
 plot(density(data_train$ALS2))
 ```
 
-**Distribution du transcriptome dans `data_train`**
+**Distribution du transcriptome et du méthylome dans `data_train`**
 
-```{r}
-plot(density(as.matrix(data_train[,4:1003])))
+```{r distr_data_rain, echo=TRUE, results="verbatim"}
+layout(matrix(1:2, 1), respect=TRUE)
+plot(density(as.matrix(data_train[,4:1003]))   , main="Transcriptome (log2(counts+1))")
+plot(density(as.matrix(data_train[,1004:2003])), main="Methylome")
+
+plot(density(as.matrix(2^(data_train[,4:1003])))   , main="Transcriptome (counts)")
+zd = t(as.matrix(((t(data_train[,4:1003]) - apply(data_train[,4:1003], 2, mean))/ apply(data_train[,4:1003], 2, sd))))
+plot(density(zd), main="Transcriptome (z-score)")
+lines(density(rnorm(100000)), lty=2, col="grey")
 ```
 
-**Distribution du methylome dans `data_train`**
+Nous considérerons que la distribution de l’expression de chaque gène est **gaussienne**.
 
-Pas utilisé dans ce TP.
 
-```{r}
-plot(density(as.matrix(data_train[,1004:2003])))
-```
+# Méthode SIS
 
-# Method 1 : SIS
+La method SIS [Shurely Independant Screening, Zhang HH. J R Stat Soc Series B Stat Methodol. 2008] appliquée au *transcriptome* (définir) consiste à 
+i) réaliser autant de regressions linéaires simples du type $ALS2~gene$ qu’il y a de gènes ; 
+ii) selectionner les gènes correspondant aux meilleurs modèles ($gene_1, gene_2, gene_3 ...$) ; 
+iii) considérer le modèle linéaire multivarié $ALS2 \sim gene_1 + gene_2 + gene_3 + ...$
 
-La method SIS [Shurely Independant Screening, Zhang HH. J R Stat Soc Series B Stat Methodol. 2008] appliquée au *transcriptome* (définir) consiste à réaliser autant de regressions linéaires simples qu’il y a de variables explicatives (gènes).
 
-*Critères*, pour chaque gène $g$ on calcule le $\beta_{g}$ et la p-valeur $pv_g$ associée. 
+1. Corrigez le code suivant pour répondre aux attentes énoncées : 
 
-*Selection de variables*, on selectionne sur le *volcano plot* les gènes qui ont les meilleurs scores, indépendamment les uns des autres.
-
-*Modèle*, on propose un modèle de regression linéaire multiple expliquant l’expression de ALS2.
-
-**Calcul des modèles indépendants**
-
-Pour chaque gènes calculer le $\beta_{gene}$ et la p-valeur associée au modèle $ALS2~gène$, on charactérisera aussi la distribution des résidus.
-
-```{r sis_compute_models, echo=TRUE}
-gs = colnames(data_train)[5:1003]
-gs
-# Go!
-for (i in 1:length(gs)) {
-  g = gs[i]
-  print(g)
-  m = lm(data_train[,"ALS2"]~data_train[,g])
+```{r screening, echo=TRUE, results="verbatim"}
+siscreening = function(data_train) {
+  gs = colnames(data_train)[5:1003]
+  pval_fisher = c()
+  beta = c()
+  r2 = c()
+  for (g in gs) {
+    m = lm(data_train[,"ALS2"]~1)       # to be update
+    pval_fisher = c(pval_fisher, 1)     # to be update, tips: look at anova(m)[,]
+    beta = c(beta, m$coefficients[[1]]) # to be update
+    r2 = c(r2, summary(m)$r.squared)
+  }
+  names(pval_fisher)  = gs
+  names(beta)         = gs  
+  names(r2)           = gs  
+  return(data.frame(pval_fisher=pval_fisher, beta=beta, r2=r2))
 }
 
+sis_res = siscreening(data_train)  
+head(sis_res)
+```
 
-pval_shapiro = c()
-pval_fisher = c()
-beta = c()
-for (g in gs) {
-  print(g)
-  m = lm(data_train[,"ALS2"]~data_train[,g])
-  res = m$residuals
-  pval_shapiro = c(pval_shapiro,shapiro.test(res)$p.value)
-  pval_fisher = c(pval_fisher, anova(m)[1,5])
-  beta = c(beta, m$coefficients[[2]])
+2. Tracez le **volcano plot** correspondant au screening :  en abscisse on trace le beta de chaque modéle indépendant et en ordonée le $-log10(pval_fisher)$ correspondant. Pensez aux titres. Commentez.
+
+3. Tracez en abscisse le $R^2$ de chaque modéle indépendant et en ordonée le $-log10(pval_fisher)$ correspondant. Pensez aux titres. Commentez.
+
+```{r volcano1, echo=TRUE, results="verbatim"}
+layout(matrix(1:2, 1), respect=TRUE)
+plot(sis_res$beta, -log10(sis_res$pval))
+# idx = -log10(sis_res$pval) > 30
+# text(sis_res[idx,]$beta, -log10(sis_res[idx,]$pval), rownames(sis_res)[idx], col=2)
+plot(sis_res$r2, -log10(sis_res$pval))                  
+```
+
+4. Commentez le code et le graphique suivant : 
+
+```{r sis_1, echo=TRUE, results="verbatim"}
+m = lm(ALS2~RGS7BP, data_train)
+layout(matrix(1:2, 1), respect=TRUE)
+plot(data_train[,"RGS7BP"],data_train[,"ALS2"], main=paste0("ALS2~RGS7BP R^2: ", signif(summary(m)$r.squared, 3)))
+abline(m,col="red")
+```
+
+
+5. Construisez un modèle avec les $8$ meilleurs candidats obtenus par SIS. Calculez le $R^2$ de ce modèle.
+
+6. Utilisez la fonction `pairs` et tracez les correlations2 à 2 des 8 meilleurs obtenus avec la méthode SIS. Commentez
+
+```{r pairs8_sis, fig.height=9, echo=TRUE, results="verbatim"}
+sis_genes = rownames(sis_res)[order(sis_res$pval_fisher)]
+pairs(data_train[,sis_genes[1:8]], main="pair_plot")
+```
+
+7. Analysez la fonction suivante. Que fait-elle ? Quelles valeurs peuvent prendre l’argument `i` ?
+
+```{r model_sis_i, echo=TRUE, results="verbatim", echo=TRUE, results="verbatim"}
+model_sis_i = function(data_train, i, screening_func=siscreening) { 
+  print(paste0("model SIS ", i))
+  # independant screening on train
+  sis_res = screening_func(data_train)
+  sis_genes = rownames(sis_res)[order(sis_res$pval_fisher)]
+  # build model
+  formula = as.formula(paste0(c("ALS2~1",sis_genes[0:i]),collapse="+"))
+  m = lm(formula, data_train)
+  return(m)
 }
-names(pval_shapiro) = gs
-names(pval_fisher)  = gs
-names(beta)         = gs
-
-
 ```
 
-**Normalité**
+8. Construisez tour à tour les modéles `sis_0`, `sis_1`, `sis_2`, ..., `sis_50`. Observez l’évolution du $R^2$ dans ces modèles. Commentez.
 
-Afficher : 
-
-- en abscisse les $-log10(p-valeurs)$ des tests de Shapiro-Wilk sur les résidus de chacun des modèles indépendants,
-- en ordonée les $-log10(p-valeurs)$ des tests de Student (ou Fisher) associés.
-
-```{r sis_normalité}
-# Go!
-plot(-log10(pval_shapiro), -log10(pval_fisher))
-
+```{r sis_n, echo=TRUE, results="hide"}
+r2_sis = c()
+for (i in 0:50) {
+ # m = ... 
+ # r2_sis = c(r2_sis, summary(m)$r.squared)
+}
+# plot(0:50, r2_sis)
 ```
-Commenter.
-
-
-**Volcano plot**
-
-Afficher : 
-
-- en abscisse les $\beta_{gene}$ des modéles de régression simple pour chaque gène $g$,
-- en ordonée les $-log10(p-valeurs)$ des tests de Student (ou Fisher) associés.
-
-```{r sis_compute_volcano}
-# Go!
-layout(1, respect=TRUE)
-plot(beta, -log10(pval_fisher), col="grey")
-text(beta, -log10(pval_fisher), names(beta))
-
-g = "RGS7BP"
-m = lm(data_train[,"ALS2"]~data_train[,g])
-plot(data_train[,g], data_train[,"ALS2"], main=g)
-abline(m, col=2)
-summary(m)$r.squared
-
-m = lm(ALS2~RGS7BP,data_train)
-
-plot(data_train[,"MFAP3"], data_train[,"RGS7BP"], main=g)
-
-plot(data_train[,"VMO1"], data_train[,"RGS7BP"], main=g)
 
 
 
 
-pairs(data_train[,names(sort(pval_fisher)[1:8])])
 
-```
-Commenter.
+# Méthode *step forward* 
 
-
-
-**Sélection de variable
-
-Enumérez vos critères.
-
-Ecrire la formulation analystique de votre modèles.
+Nous venons de voir que tous les gènes n’apportent pas la même quantité d’information "nouvelle". Nous allons tirer partie de la méthode de sélection variables *step forward* pour sélectionner les gènes qui apportent de l’information "nouvelle". En effet, nous allons partir du modèle nul et ajouter un à un les gènes, parmi les 50 meilleurs gênes obtenu grace à la méthode SIS, qui augmentent considérablement la qualité du modèle.
 
 
+1. Analyser le code suivant. Que fait la fontion `step` ? Que contient la variable retournée `step_genes` ?
 
-```{r echo=TRUE, results="verbatim"}
-selected_genes = names(sort(pval_fisher)[1:8])
-selected_genes
-
-m1 = lm(ALS2~RGS7BP,data_train)
-summary(m1)$r.squared
-
-m8 = lm(ALS2~RGS7BP+MFAP3+PRRC2C+VMO1+SCRN3+NRIP1+PCNX1+TMUB1, data_train)
-summary(m8)$r.squared
-
-selected_genes = names(sort(pval_fisher)[1:12])
-formula = as.formula(paste0("ALS2~", paste0(selected_genes, collapse="+")))
-formula
-m12 = lm(formula, data_train)
-summary(m12)$r.squared
-
-
-r2 = c()
-for (i in 1:12) {
-  selected_genes = names(sort(pval_fisher)[1:i])
-  formula = as.formula(paste0("ALS2~", paste0(selected_genes, collapse="+")))
-  formula
-  mi = lm(formula, data_train)
-  r2 = c(r2,summary(mi)$r.squared)
+```{r step_model, echo=TRUE, results="hide"}
+stepforward = function(data_train, sis_genes, trace, nb_sis_genes=50) {
+  m_lo = lm(ALS2 ~ 1, data=data_train[,c("ALS2", sis_genes[1:nb_sis_genes])])
+  m_up = lm(ALS2 ~ ., data=data_train[,c("ALS2", sis_genes[1:nb_sis_genes])])
+  m_fwd = step(m_lo, method="forward", scope=list(upper=m_up,lower=m_lo), trace=trace)  
+  # print(m_fwd$call)
+  step_genes = names(m_fwd$coefficients)[-1]
 }
 
-plot(r2)
+step_genes = stepforward(data_train, sis_genes, trace=1)
+step_genes
 ```
 
-Tracer :
-  - en abscisse i de 1 à 12
-  - en ordonnée `summary(mi)$r.squared`
+2. Utilisez la fonction `pairs` popurt tracer les correlations2 à 2 des 8 meilleurs obtenus avec la méthode `step`.
+
+```{r pairs8_step, fig.height=9}
+pairs(data_train[,step_genes[1:8]], main="pair_plot")
+```
+
+3. Affichez sur le volcano plot du screening indépendant les génes selectionné par `stepforward`. Commentez.
+
+```{r volcano2, echo=TRUE, results="verbatim"}
+layout(matrix(1:2, 1), respect=TRUE)
+plot(sis_res$beta, -log10(sis_res$pval))
+idx = step_genes
+text(sis_res[idx,]$beta, -log10(sis_res[idx,]$pval), idx, col=2)
+```
 
 
-**Prédiction**
+4. Analysez la fonction suivante. Que fait-elle ? Quelles valeurs peuvent prendre l’argument `i` ?
 
-1. Prédisez les valeurs de ALS2 du jeu de donnée `data_train`
-2. Prédisez les valeurs de ALS2 du jeu de donnée `data_test`
-3. Score obtenu sur codalab
-4. Comparer
+```{r model_stp_i, echo=TRUE, results="verbatim"}
+model_stp_i = function(data_train, i, step_func=stepforward) { 
+  print(paste0("model step ", i))
+  # independant screening on train
+  sis_res = msiscreening(data_train)
+  sis_genes = rownames(sis_res)[order(sis_res$pval_fisher)]
+  # step
+  step_genes = step_func(data_train, sis_genes, trace=0)
+  # build model
+  formula = as.formula(paste0(c("ALS2~1",step_genes[0:i]),collapse="+"))
+  m = lm(formula, data_train)
+  return(m)
+}
+```
 
-```{r sis_pred}
-"RMSE" = function(data_truth, data_pred) {
+5. Construisez tour à tour les modéles `stp_0`, `stp_1`, `stp_2`, ..., `stp_20`. Observez l’évolution du $R^2$ dans ces modèles. Comparez avec l’évolution du $R^2$ obetnue avec les modèles `sis_0`, `sis_1`, `sis_2`, ..., `sis_50`. Commentez.
+
+```{r step_n, echo=TRUE, results="verbatim"}
+r2_step <- c()
+for(i in 0:20){
+  # m = ...
+  # r2_step = c(r2_step, summary(m)$r.squared)
+}
+
+# plot(0:50, r2_sis, ylim=c(0,1))
+# points(0:20, r2_step, col=2)
+```
+
+
+
+
+
+**Mais où s’arrêter ? Comment contrôler le sur-apprentissage ?**
+
+
+
+
+
+
+
+
+
+
+
+
+# Validation croisée
+
+Nous allons chercher à controler le sur-apprenstissage de nos modlèles en utilisant uniquement le jeu de données `data_train` : 
+
+1. Nous divisons le jeu de données data_train en 5 *folds* (`flds`).
+
+2. Nous construisons 5 jeux de données *train/test*  (`runs`) à partir des *folds*. Pour chaque  jeux de données, les données d’entrainement  (`train`) sont **indépendant** des données de test (`test`).
+
+3. Pour chaque jeux de données *train/test* : 
+
+  - nous entrainons notre modèle sur `train` 
+  - nous prédisons ALS2 du jeu de données `train` et calculons l’erreur associée
+  - nous prédisons ALS2 du jeu de données `test` et calculons l’erreur associée
+  
+4. En comparant les erreurs obtenues pour les jeux de données `train` et pour les jeux de données `test`, nous estimons le sur-apprentissage.  
+
+
+```{r cross_val, echo=TRUE}
+#  1. folds
+flds = list()
+set.seed(1)
+idx_samples = sample(rownames(data_train))
+flds[[1]] = idx_samples[001:080]
+flds[[2]] = idx_samples[081:160]
+flds[[3]] = idx_samples[161:240]
+flds[[4]] = idx_samples[241:320]
+flds[[5]] = idx_samples[321:400]
+
+# 2. runs
+runs = list()
+runs[[1]] = list(train=data_train[setdiff(idx_samples, flds[[1]]),], test=data_train[flds[[1]],])
+runs[[2]] = list(train=data_train[setdiff(idx_samples, flds[[2]]),], test=data_train[flds[[2]],])
+runs[[3]] = list(train=data_train[setdiff(idx_samples, flds[[3]]),], test=data_train[flds[[3]],])
+runs[[4]] = list(train=data_train[setdiff(idx_samples, flds[[4]]),], test=data_train[flds[[4]],])
+runs[[5]] = list(train=data_train[setdiff(idx_samples, flds[[5]]),], test=data_train[flds[[5]],])
+# 3. eval
+RMSE = function(data_truth, data_pred) {
     # Root Mean Square Error
     return(sqrt(mean((data_truth - data_pred)^2)))
 }
-# Go!
-data_truth = data_train$ALS2
-# data_pred = predict(data_train...)
-# score =  RMSE(data_truth, data_train)
 
-m0 = lm(ALS2~1, data_train)
-data_pred = predict(m0, data_train, type="response")
-data_truth = data_train$ALS2
-err0_train0 = RMSE(data_truth, data_pred)
-err0_train0
-
-m1 = lm(ALS2~RGS7BP, data_train)
-data_pred = predict(m1, data_train, type="response")
-data_truth = data_train$ALS2
-err0_train1 = RMSE(data_truth, data_pred)
-err0_train1
-
-m2 = lm(ALS2~RGS7BP+MFAP3, data_train)
-data_pred = predict(m2, data_train, type="response")
-data_truth = data_train$ALS2
-err0_train2 = RMSE(data_truth, data_pred)
-err0_train2
-
-err_train = c()
-for (i in 1:8) {
-  selected_genes = names(sort(pval_fisher)[1:i])
-  formula = as.formula(paste0("ALS2~", paste0(selected_genes, collapse="+")))
-  formula
-  mi = lm(formula, data_train)
-  data_pred = predict(mi, data_train, type="response")
-  data_truth = data_train$ALS2
-  err_train[i] = RMSE(data_truth, data_pred)
+msiscreening = memoise::memoise(siscreening)
+mstepforward = memoise::memoise(stepforward)
+model_func = function(train) {
+  model_sis_i(train, 20, screening_func=msiscreening) 
 }
- 
-err_test = c()
-err_test[1] = 0.2800726811
-err_test[2] = 0.2370102069
-err_test[3] = 0.2351253487
-err_test[4] = 0.2299540168
-err_test[5] = 0.2142468642
-err_test[6] = 0.2169962834
-err_test[7] = 0.2159720152
-err_test[8] = 0.2154245011  
 
-
-
-
-plot( 1:8, err_test, ylim=c(0,0.4), col=2, type="l")
-lines(1:8, err_train, col=4)
-legend("bottomleft", col=c(2,4), c("test", "train"), lty=1)
-
-
-
-
-  
-
-
-```
-
-**Commentaires
-
-
-
-# Method 2 : ACP
-
-
-```{r pca2, eval=TRUE}
-d = as.matrix(data_train[,1004:2003])
-pca = prcomp(d, scale=TRUE)
-
-v = pca$sdev * pca$sdev
-p = v / sum(v) * 100
-
-layout(matrix(1:6,2), respect=TRUE)
-# layout(matrix(1:2,1), respect=TRUE)
-barplot(p)
-
-# data_train$histo2 = as.factor(substr(data_train$histology, 1, 5))
-data_train$histo2 = data_train$histology
+train_err=c()
+test_err=c()
 for (i in 1:5) {
-  j = i+1
-  plot(pca$x[,i], pca$x[,j], xlab=paste0("PC", i, "(", signif(p[i], 3), "%)"), ylab=paste0("PC", j, "(", signif(p[j], 3), "%)"), pch=16, col=as.numeric(data_train[rownames(pca$x),]$histo2))
-  scale_factor = min(abs(c(min(c(pca$x[,i], pca$x[,j])), max(c(pca$x[,i], pca$x[,j])))))  
-  # scale_factor = min(abs(c(max(min(pca$x[,i]), min(pca$x[,j])), min(max(pca$x[,i]), max(pca$x[,j])))))
-  plotrix::draw.ellipse(0,0,scale_factor,scale_factor, lty=2, border="grey")
-  # arrows(0,0,pca$rotation[,i]*scale_factor, pca$rotation[,j]*scale_factor, col="grey")
-  # text(pca$rotation[,i]*scale_factor, pca$rotation[,j]*scale_factor, rownames(pca$rotation))
+  train = runs[[i]]$train
+  test = runs[[i]]$test
+  m = model_func(train)
+  train_pred = predict(m, train, type="response")
+  train_truth = train$ALS2
+  train_err[i] = RMSE(train_truth, train_pred)
+  test_pred = predict(m, test, type="response")
+  test_truth = test$ALS2
+  test_err[i] = RMSE(test_truth, test_pred)  
+} 
+stats = data.frame(set=rep(c("train", "trest"), each=5), rmse=c(train_err, test_err)) 
+
+# 4. error
+bp = boxplot(rmse~set, stats, las=2, border="grey")  
+points(apply(bp$stats, 2, mean), col=c(2,4))
+legend("topright", c("mean on trains", "mean on tests"), pch=1, col=c(2,4))
+```
+
+
+1. Pour chacun des deux modèles `model_sis_i` et `model_stp_i` , determinez la valeur de `i` qui minimise l’erreur de la prédiction tout en controlant le sur-apprentisssage. 
+
+2. Comparez les erreurs moyennes obtenus sur i) les jeux de données d’apprentisssage de la validation croisée, ii) les jeux de données de test de la validation croisée, iii) le jeu de données `data_train`, iv) la plateforme *codalb*. Commentez.
+
+
+
+
+
+
+```{r cross_val_huge, eval=FALSE}
+models = list()
+models[["msis_00"]] = function(train) { model_sis_i(train, 00, screening_func=msiscreening) }
+models[["msis_01"]] = function(train) { model_sis_i(train, 01, screening_func=msiscreening) }
+models[["msis_02"]] = function(train) { model_sis_i(train, 02, screening_func=msiscreening) }
+models[["msis_03"]] = function(train) { model_sis_i(train, 03, screening_func=msiscreening) }
+models[["msis_04"]] = function(train) { model_sis_i(train, 04, screening_func=msiscreening) }
+models[["msis_05"]] = function(train) { model_sis_i(train, 05, screening_func=msiscreening) }
+models[["msis_06"]] = function(train) { model_sis_i(train, 06, screening_func=msiscreening) }
+models[["msis_07"]] = function(train) { model_sis_i(train, 07, screening_func=msiscreening) }
+models[["msis_08"]] = function(train) { model_sis_i(train, 08, screening_func=msiscreening) }
+models[["msis_09"]] = function(train) { model_sis_i(train, 09, screening_func=msiscreening) }
+models[["msis_10"]] = function(train) { model_sis_i(train, 10, screening_func=msiscreening) }
+models[["msis_11"]] = function(train) { model_sis_i(train, 11, screening_func=msiscreening) }
+models[["msis_12"]] = function(train) { model_sis_i(train, 12, screening_func=msiscreening) }
+models[["msis_13"]] = function(train) { model_sis_i(train, 13, screening_func=msiscreening) }
+models[["msis_14"]] = function(train) { model_sis_i(train, 14, screening_func=msiscreening) }
+models[["msis_15"]] = function(train) { model_sis_i(train, 15, screening_func=msiscreening) }
+models[["msis_16"]] = function(train) { model_sis_i(train, 16, screening_func=msiscreening) }
+models[["msis_17"]] = function(train) { model_sis_i(train, 17, screening_func=msiscreening) }
+models[["msis_18"]] = function(train) { model_sis_i(train, 18, screening_func=msiscreening) }
+models[["msis_19"]] = function(train) { model_sis_i(train, 19, screening_func=msiscreening) }
+models[["msis_20"]] = function(train) { model_sis_i(train, 20, screening_func=msiscreening) }
+models[["msis_30"]] = function(train) { model_sis_i(train, 30, screening_func=msiscreening) }
+models[["msis_40"]] = function(train) { model_sis_i(train, 40, screening_func=msiscreening) }
+models[["msis_50"]] = function(train) { model_sis_i(train, 50, screening_func=msiscreening) }
+models[["mstp_00"]] = function(train) { model_stp_i(train, 00, step_func=mstepforward) }
+models[["mstp_01"]] = function(train) { model_stp_i(train, 01, step_func=mstepforward) }
+models[["mstp_02"]] = function(train) { model_stp_i(train, 02, step_func=mstepforward) }
+models[["mstp_03"]] = function(train) { model_stp_i(train, 03, step_func=mstepforward) }
+models[["mstp_04"]] = function(train) { model_stp_i(train, 04, step_func=mstepforward) }
+models[["mstp_05"]] = function(train) { model_stp_i(train, 05, step_func=mstepforward) }
+models[["mstp_06"]] = function(train) { model_stp_i(train, 06, step_func=mstepforward) }
+models[["mstp_07"]] = function(train) { model_stp_i(train, 07, step_func=mstepforward) }
+models[["mstp_08"]] = function(train) { model_stp_i(train, 08, step_func=mstepforward) }
+models[["mstp_09"]] = function(train) { model_stp_i(train, 09, step_func=mstepforward) }
+models[["mstp_10"]] = function(train) { model_stp_i(train, 10, step_func=mstepforward) }
+models[["mstp_10"]] = function(train) { model_stp_i(train, 10, step_func=mstepforward) }
+models[["mstp_11"]] = function(train) { model_stp_i(train, 11, step_func=mstepforward) }
+models[["mstp_12"]] = function(train) { model_stp_i(train, 12, step_func=mstepforward) }
+models[["mstp_13"]] = function(train) { model_stp_i(train, 13, step_func=mstepforward) }
+models[["mstp_14"]] = function(train) { model_stp_i(train, 14, step_func=mstepforward) }
+models[["mstp_15"]] = function(train) { model_stp_i(train, 15, step_func=mstepforward) }
+
+cross_val = function(models, runs, RMSE) { 
+  stats = lapply(names(models), function(model_name){
+    train_err=c()
+    test_err=c()
+    for (i in 1:5) {
+      train = runs[[i]]$train
+      test = runs[[i]]$test
+      m = models[[model_name]](train)
+      train_pred = predict(m, train, type="response")
+      train_truth = train$ALS2
+      train_err[i] = RMSE(train_truth, train_pred)
+      test_pred = predict(m, test, type="response")
+      test_truth = test$ALS2
+      test_err[i] = RMSE(test_truth, test_pred)  
+    } 
+
+    stats = data.frame(set=rep(c("train", "trest"), each=5), rmse=c(train_err, test_err)) 
+    stats$model=model_name
+    return(stats)
+  })
+  stats = do.call(rbind, stats)
+  stats$model = factor(stats$model, levels=names(models))
+  bp = boxplot(rmse~set+model, stats, las=2, border="grey")  
+  points(apply(bp$stats, 2, mean), col=c(2,4))
+  legend("topright", c("mean on trains", "mean on tests"), pch=1, col=c(2,4))
 }
-```
 
-```{r pairs, fig.height=9}
-pairs(pca$x[,1:8], pch=".", col=as.numeric(data_train[rownames(pca$x),]$histo2))
-```
-
-```{r hm, eval=FALSE}
-data = t(as.matrix(data_train[,0004:1003]))
-source("~/projects/epimedpipelines/results/commons.R")
-plot_expr_hm(data=data, normalization="zscore_rows",   colors=c("cyan", "cyan", "black", "red", "red"))
+cross_val(models, runs, RMSE)
 ```
 
 
-# Session Information
+
+
+
+
+
+
+# Conclusion
+
+**ATTENTION**, il faut veiller à ce que chaque entrainemnt du modèle se fasse sur un jeux de données indépendants du jeu de test, popur éviter  la **fuite d’information**. Ici nous avons veillé à calculer les variables `sis_genes` et `step_genes` sur les jeu de données d’entrainement indépendant des jeux de données test.
+
+La validation croisée est un outil ici permettant de fixer les *hyper-paramètres* de nos modèles (ici, le nombre de variables explicatives des modèles `model_sis_i` et `model_stp_i`. De la même manière nous pourrions optimiser le nombre de gènes candidat obtenus par la méthode "SIS" et que l’on ojecte dans la méthode "step" (ici 50).
+
+
+
+
+
+
+
+# Annexe : la *mémoïsation*
+
+**Définition** : *En informatique, la mémoïsation est la mise en cache des valeurs de retour d’une fonction selon ses valeurs d’entrée. Le but de cette technique d’optimisation de code est de diminuer le temps d’exécution d’un programme informatique en mémorisant les valeurs retournées par une fonction.* 
+
+https://fr.wikipedia.org/wiki/Mémoïsation
+
+
+```{r memoise_demo, echo=TRUE, eval=FALSE}
+sis_res = siscreening(data_train)  
+msiscreening = memoise::memoise(siscreening)
+sis_res = msiscreening(data_train)  
+sis_res = msiscreening(data_train)  
+sis_res = msiscreening(data_train)  
+sis_res = msiscreening(data_train)  
+msiscreening = memoise::memoise(siscreening)
+sis_res = msiscreening(data_train)  
+sis_res = msiscreening(data_train)  
+sis_res = msiscreening(data_train)  
+```
+
+**Exercice** : predisez le comportement des codes suivants : 
+
+```{r memoise_exo, echo=TRUE, eval=FALSE}
+sleep = Sys.sleep
+msleep = memoise::memoise(sleep)
+sleep(3)
+sleep(3)
+msleep(3)
+msleep(3)
+msleep = memoise::memoise(sleep)
+msleep(3)
+
+mrnorm = memoise::memoise(rnorm)
+rnorm(1)
+mrnorm(1)
+```
+
+**ATTENTION** : 
+
+  - La *memoïsation* repose sur le calcul d’une clef de hachage des variables passées en argument de la fonction à mémoïser. Si les valeurs des variables sont trop volumineuses, le caclcul de la clef peut prendre beaucoup de temps. 
+  - Si la fonction à mémoïser est stochastique alors la fonction mémoïsée perd sa stochasticité. Cette dernière pratique n’a pas forcément de sens. 
+
+
+# Information de session
 
 ```{r, results="verbatim"}
 sessionInfo()
