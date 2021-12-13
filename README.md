@@ -13,7 +13,7 @@ A presentation is also available there:
   https://studio.youtube.com/video/dyk8CAQVWHE/edit
   
 And an extented starting kit including a guided report there:
-  https://github.com/fchuffar/starting_kit_expred3.0
+  https://youtu.be/dyk8CAQVWHE
 
 We hope you will enjoy the challenge.
 
