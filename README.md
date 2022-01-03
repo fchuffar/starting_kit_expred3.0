@@ -10,10 +10,10 @@ Secret URL is:
   https://competitions.codalab.org/competitions/28931?secret_key=156ec53c-3ae2-4788-ac69-1eb11c467910  
 
 A presentation is also available there: 
-  https://studio.youtube.com/video/dyk8CAQVWHE/edit
+  https://youtu.be/dyk8CAQVWHE
   
 And an extented starting kit including a guided report there:
-  https://youtu.be/dyk8CAQVWHE
+  https://github.com/fchuffar/starting_kit_expred3.0
 
 We hope you will enjoy the challenge.
 
