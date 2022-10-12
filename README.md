@@ -17,5 +17,5 @@ And an extented starting kit including a guided report there:
 
 We hope you will enjoy the challenge.
 
---
+--<br/>
 The Gene Expression Prediction Challenge 3.0 (expred3.0) Team
