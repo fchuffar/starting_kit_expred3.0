@@ -17,7 +17,8 @@ knitr::opts_chunk$set(collapse=TRUE, comment = "#>", fig.width=9, fig.height=6, 
 
 Ce document propose deux méthodes pour résoudre le *data challenge* `expred3.0` disponible ici : 
 
-https://competitions.codalab.org/competitions/28931?secret_key=156ec53c-3ae2-4788-ac69-1eb11c467910
+https://codalab.lisn.upsaclay.fr/competitions/8696?secret_key=3f32bbfc-9942-4e60-b241-bd10300d1bce
+
 
 L’**objectif** est double : 
 
@@ -281,6 +282,7 @@ runs[[2]] = list(train=data_train[setdiff(idx_samples, flds[[2]]),], test=data_t
 runs[[3]] = list(train=data_train[setdiff(idx_samples, flds[[3]]),], test=data_train[flds[[3]],])
 runs[[4]] = list(train=data_train[setdiff(idx_samples, flds[[4]]),], test=data_train[flds[[4]],])
 runs[[5]] = list(train=data_train[setdiff(idx_samples, flds[[5]]),], test=data_train[flds[[5]],])
+
 # 3. eval
 RMSE = function(data_truth, data_pred) {
     # Root Mean Square Error
