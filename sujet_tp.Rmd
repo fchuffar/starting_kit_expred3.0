@@ -179,10 +179,10 @@ Nous venons de voir que tous les gènes n’apportent pas la même quantité d�
 1. Analyser le code suivant. Que fait la fontion `step` ? Que contient la variable retournée `step_genes` ?
 
 ```{r step_model, echo=TRUE, results="hide"}
-stepforward = function(data_train, sis_genes, trace=0, nb_sis_genes=50) {
+stepforward = function(data_train, sis_genes, nb_sis_genes=50, trace=0, k=2) {
   m_lo = lm(ALS2 ~ 1, data=data_train[,c("ALS2", sis_genes[1:nb_sis_genes])])
   m_up = lm(ALS2 ~ ., data=data_train[,c("ALS2", sis_genes[1:nb_sis_genes])])
-  m_fwd = step(m_lo, method="forward", scope=list(upper=m_up,lower=m_lo), trace=trace)  
+  m_fwd = step(m_lo, method="forward", scope=list(upper=m_up,lower=m_lo), trace=trace, k=k)  
   # print(m_fwd$call)
   step_genes = names(m_fwd$coefficients)[-1]
 }
@@ -217,7 +217,7 @@ model_stp_i = function(data_train, i, step_func=stepforward) {
   sis_res = msiscreening(data_train)
   sis_genes = rownames(sis_res)[order(sis_res$pval_fisher)]
   # step
-  step_genes = step_func(data_train, sis_genes, trace=0)
+  step_genes = step_func(data_train, sis_genes, trace=0, k=0)
   # build model
   formula = as.formula(paste0(c("ALS2~1",step_genes[0:i]),collapse="+"))
   m = lm(formula, data_train)
@@ -228,14 +228,14 @@ model_stp_i = function(data_train, i, step_func=stepforward) {
 5. Construisez tour à tour les modéles `stp_0`, `stp_1`, `stp_2`, ..., `stp_20`. Observez l’évolution du $R^2$ dans ces modèles. Comparez avec l’évolution du $R^2$ obetnue avec les modèles `sis_0`, `sis_1`, `sis_2`, ..., `sis_50`. Commentez.
 
 ```{r step_n, echo=TRUE, results="verbatim"}
-r2_step <- c()
+r2_stp <- c()
 for(i in 0:20){
   # m = ...
-  # r2_step = c(r2_step, summary(m)$r.squared)
+  # r2_stp = c(r2_stp, summary(m)$r.squared)
 }
 
 # plot(0:50, r2_sis, ylim=c(0,1))
-# points(0:20, r2_step, col=2)
+# points(0:20, r2_stp, col=2)
 ```
 
 
