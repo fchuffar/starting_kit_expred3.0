@@ -74,7 +74,7 @@ Nous considérerons que la distribution de l’expression de chaque gène est **
 # Méthode SIS
 
 La method SIS [Shurely Independant Screening, Zhang HH. J R Stat Soc Series B Stat Methodol. 2008] appliquée au *transcriptome* (définir) consiste à 
-i) réaliser autant de regressions linéaires simples du type $ALS2~gene$ qu’il y a de gènes ; 
+i) réaliser autant de regressions linéaires simples du type $ALS2 \sim gene$ qu’il y a de gènes ; 
 ii) selectionner les gènes correspondant aux meilleurs modèles ($gene_1, gene_2, gene_3 ...$) ; 
 iii) considérer le modèle linéaire multivarié $ALS2 \sim gene_1 + gene_2 + gene_3 + ...$
 
