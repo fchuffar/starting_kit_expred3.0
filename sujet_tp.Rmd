@@ -45,6 +45,7 @@ dim(data_test)
 head(data_train[,1:6])
 table(data_train$sex)
 table(data_train$histology)
+head(data_train[,4:9])
 head(data_train[,1004:1009])
 ```
 
@@ -74,7 +75,7 @@ Nous considérerons que la distribution de l’expression de chaque gène est **
 # Méthode SIS
 
 La method SIS [Shurely Independant Screening, Zhang HH. J R Stat Soc Series B Stat Methodol. 2008] appliquée au *transcriptome* (définir) consiste à 
-i) réaliser autant de regressions linéaires simples du type $ALS2~gene$ qu’il y a de gènes ; 
+i) réaliser autant de regressions linéaires simples du type $ALS2 \sim gene$ qu’il y a de gènes ; 
 ii) selectionner les gènes correspondant aux meilleurs modèles ($gene_1, gene_2, gene_3 ...$) ; 
 iii) considérer le modèle linéaire multivarié $ALS2 \sim gene_1 + gene_2 + gene_3 + ...$
 
@@ -103,13 +104,14 @@ sis_res = siscreening(data_train)
 head(sis_res)
 ```
 
-2. Tracez le **volcano plot** correspondant au screening :  en abscisse on trace le beta de chaque modéle indépendant et en ordonée le $-log10(pval_fisher)$ correspondant. Pensez aux titres. Commentez.
+2. Tracez le **volcano plot** correspondant au screening :  en abscisse on trace le beta de chaque modéle indépendant et en ordonée le $-log10(pval_{fisher})$ correspondant. Pensez aux titres. Commentez.
 
-3. Tracez en abscisse le $R^2$ de chaque modéle indépendant et en ordonée le $-log10(pval_fisher)$ correspondant. Pensez aux titres. Commentez.
+
+3. Tracez en abscisse le $R^2$ de chaque modéle indépendant et en ordonée le $-log10(pval_{fisher})$ correspondant. Pensez aux titres. Commentez.
 
 ```{r volcano1, echo=TRUE, results="verbatim"}
 layout(matrix(1:2, 1), respect=TRUE)
-plot(sis_res$beta, -log10(sis_res$pval))
+plot(sis_res$beta, -log10(sis_res$pval), main="Volcano plot")
 # idx = -log10(sis_res$pval) > 30
 # text(sis_res[idx,]$beta, -log10(sis_res[idx,]$pval), rownames(sis_res)[idx], col=2)
 plot(sis_res$r2, -log10(sis_res$pval))                  
@@ -125,12 +127,17 @@ abline(m,col="red")
 ```
 
 
-5. Construisez un modèle avec les $8$ meilleurs candidats obtenus par SIS. Calculez le $R^2$ de ce modèle.
+5. Construisez un modèle avec les $8$ meilleurs candidats obtenus par SIS (les $R^2$ les plus petits). Calculez le $R^2$ de ce modèle.
+
+```{r pairs8_sis, fig.height=9, echo=TRUE, results="verbatim"}
+sis_genes = rownames(sis_res)[order(sis_res$pval_fisher)]
+head(sis_res,8)
+```
+
 
 6. Utilisez la fonction `pairs` et tracez les correlations2 à 2 des 8 meilleurs obtenus avec la méthode SIS. Commentez
 
 ```{r pairs8_sis, fig.height=9, echo=TRUE, results="verbatim"}
-sis_genes = rownames(sis_res)[order(sis_res$pval_fisher)]
 pairs(data_train[,sis_genes[1:8]], main="pair_plot")
 ```
 
@@ -172,7 +179,7 @@ Nous venons de voir que tous les gènes n’apportent pas la même quantité d�
 1. Analyser le code suivant. Que fait la fontion `step` ? Que contient la variable retournée `step_genes` ?
 
 ```{r step_model, echo=TRUE, results="hide"}
-stepforward = function(data_train, sis_genes, trace, nb_sis_genes=50) {
+stepforward = function(data_train, sis_genes, trace=0, nb_sis_genes=50) {
   m_lo = lm(ALS2 ~ 1, data=data_train[,c("ALS2", sis_genes[1:nb_sis_genes])])
   m_up = lm(ALS2 ~ ., data=data_train[,c("ALS2", sis_genes[1:nb_sis_genes])])
   m_fwd = step(m_lo, method="forward", scope=list(upper=m_up,lower=m_lo), trace=trace)  
@@ -186,7 +193,8 @@ step_genes
 
 2. Utilisez la fonction `pairs` popurt tracer les correlations2 à 2 des 8 meilleurs obtenus avec la méthode `step`.
 
-```{r pairs8_step, fig.height=9}
+```{r volcano2, echo=TRUE, results="verbatim", fig.height=9}
+layout(1, respect=TRUE)
 pairs(data_train[,step_genes[1:8]], main="pair_plot")
 ```
 
